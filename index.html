@@ -5,31 +5,120 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Silent Orbit</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #000; color: #d8dde6; font: 15px/1.5 system-ui, sans-serif; overflow: hidden; }
+    :root {
+      --ink: #e4e8ef; --muted: #8a92a0; --faint: #5a6270; --line: #232833; --panel: rgba(255, 255, 255, 0.025);
+      --accent: #00daff; --accent2: #ff58ce;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #000; color: var(--ink); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; }
     canvas { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: none; }
-    #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #000; z-index: 2; }
-    #overlay[hidden], #lock[hidden], #hud[hidden] { display: none; }
-    h1 { font-weight: 300; letter-spacing: 0.35em; text-transform: uppercase; font-size: 22px; margin: 0; }
-    .track { width: min(360px, 70vw); height: 2px; background: #1c2027; }
-    #bar { height: 100%; width: 0; background: #d8dde6; transition: width 0.15s linear; }
-    #status, #hint { font-size: 13px; color: #8a92a0; min-height: 1.5em; text-align: center; padding: 0 16px; }
-    button { background: none; color: #d8dde6; border: 1px solid #5a6270; padding: 8px 28px; font: inherit; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; }
-    button:disabled { opacity: 0.35; cursor: default; }
-    button:not(:disabled):hover { border-color: #d8dde6; }
-    #lock { position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); z-index: 1; font-size: 12px; }
+    [hidden] { display: none !important; }
+
+    /* ---- ecrã inicial ---- */
+    #overlay { position: fixed; inset: 0; z-index: 2; overflow-y: auto; display: flex; padding: 28px 16px;
+      background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%), #000;
+      transition: background 0.8s ease; }
+    .card { margin: auto; width: min(460px, 100%); display: flex; flex-direction: column; align-items: center; gap: 22px; }
+    h1 { font-weight: 300; letter-spacing: 0.42em; text-transform: uppercase; font-size: 22px; margin: 0 0 0 0.42em; }
+    .sub { margin: -14px 0 0; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+    .track { width: 100%; height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
+    #bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.15s linear; }
+    #status { font-size: 13px; color: var(--muted); min-height: 1.5em; text-align: center; margin-top: -12px; }
+
+    .controls { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 6px 18px; }
+    .controls h2 { font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); margin: 12px 0 2px; }
+    .row { display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+    .controls h2 + .row { border-top: 0; }
+    .row .what { font-size: 14px; }
+    .row .what small { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
+    .icon { justify-self: center; color: var(--ink); opacity: 0.85; }
+    .range { display: flex; align-items: center; gap: 3px; color: var(--faint); font-size: 12px; }
+    kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; font: 500 12px/1 ui-monospace, 'SF Mono', Consolas, monospace;
+      color: var(--ink); background: linear-gradient(#1b1f27, #12151b); border: 1px solid #343a46; border-bottom-width: 2px; border-radius: 6px; }
+
+    .schemes { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 2px; }
+    .scheme { all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 8px 4px 9px; border-radius: 8px;
+      border: 1px solid transparent; transition: border-color 0.25s, background 0.25s; }
+    .scheme:hover { background: rgba(255, 255, 255, 0.03); }
+    .scheme:focus-visible { outline: 1px solid var(--muted); outline-offset: 2px; }
+    .scheme[aria-pressed="true"] { border-color: color-mix(in srgb, var(--c1) 55%, transparent); background: color-mix(in srgb, var(--c1) 7%, transparent); }
+    .swatch { position: relative; width: 100%; max-width: 86px; aspect-ratio: 16 / 10; border-radius: 6px; overflow: hidden;
+      background: radial-gradient(ellipse 90% 70% at 50% 60%, color-mix(in srgb, var(--bg) 70%, white 6%), var(--bg)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+    .swatch::before, .swatch::after { content: ''; position: absolute; left: -10%; right: -10%; height: 2px; border-radius: 2px; transform: rotate(-14deg); }
+    .swatch::before { top: 40%; background: var(--c1); box-shadow: 0 0 6px var(--c1), 0 0 14px var(--c1); }
+    .swatch::after { top: 62%; background: var(--c2); box-shadow: 0 0 6px var(--c2), 0 0 14px var(--c2); }
+    .scheme .name { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+    .scheme .name kbd { min-width: 20px; height: 20px; font-size: 11px; padding: 0 5px; }
+    .scheme[aria-pressed="true"] .name kbd { border-color: color-mix(in srgb, var(--c1) 60%, #343a46); }
+    .scheme .tone { font-size: 11px; line-height: 1.3; color: var(--faint); margin-top: -4px; text-align: center; }
+
+    #start { all: unset; cursor: pointer; padding: 10px 34px; font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink);
+      border: 1px solid #4a5260; border-radius: 999px; transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s; }
+    #start:disabled { opacity: 0.35; cursor: default; }
+    #start:not(:disabled):hover, #start:not(:disabled):focus-visible { border-color: var(--accent); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+    #hint { font-size: 12px; color: var(--faint); text-align: center; margin-top: -10px; display: flex; align-items: center; gap: 8px; }
+
+    /* ---- durante a experiência ---- */
+    #lock { all: unset; cursor: pointer; position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); z-index: 1; font-size: 12px; letter-spacing: 0.08em;
+      color: var(--ink); padding: 8px 18px; border: 1px solid #4a5260; border-radius: 999px; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(6px); }
+    #toast { position: fixed; left: 50%; top: 28px; z-index: 1; transform: translate(-50%, -6px); display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 8px;
+      font-size: 12.5px; letter-spacing: 0.06em; color: var(--ink); border-radius: 999px; background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.08); opacity: 0; pointer-events: none; transition: opacity 0.5s ease, transform 0.5s ease; }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+    #toast .dot { width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, var(--c1), var(--c2)); box-shadow: 0 0 10px var(--c1); }
     #hud { position: fixed; left: 8px; top: 6px; z-index: 1; font: 11px/1.4 ui-monospace, monospace; color: #9aa3b0; white-space: pre; pointer-events: none; }
+    /* Ecrãs baixos: tudo cabe sem deslocar a página. */
+    @media (max-height: 760px) {
+      .card { gap: 14px; } .sub { margin-top: -10px; } #status { margin-top: -8px; } #hint { margin-top: -6px; }
+      .controls h2 { margin-top: 9px; } .row { padding: 8px 0; } .row .what small { line-height: 1.35; }
+      .swatch { aspect-ratio: 16 / 7; } .scheme { padding: 6px 4px; gap: 5px; } .scheme .tone { display: none; }
+    }
+    @media (max-height: 600px) { .sub { display: none; } .row .what small { font-size: 12px; } h1 { font-size: 19px; } }
+    @media (prefers-reduced-motion: reduce) { #toast, #overlay, .scheme { transition: none; } }
   </style>
 </head>
 <body>
   <canvas id="scene"></canvas>
   <div id="overlay">
-    <h1>Silent Orbit</h1>
-    <div class="track"><div id="bar"></div></div>
-    <div id="status">A carregar…</div>
-    <button id="start" disabled>A carregar</button>
-    <div id="hint"></div>
+    <div class="card">
+      <h1>Silent Orbit</h1>
+      <p class="sub">uma viagem guiada pelo olhar</p>
+      <div class="track"><div id="bar"></div></div>
+      <div id="status">A carregar…</div>
+
+      <section class="controls" aria-label="Controlos">
+        <h2>Controlos</h2>
+        <div class="row">
+          <svg class="icon" width="22" height="32" viewBox="0 0 22 32" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="19" height="29" rx="9.5"/><line x1="11" y1="6" x2="11" y2="11" stroke-linecap="round"/>
+          </svg>
+          <div class="what">Olhar
+            <small>Move o rato para olhar à volta. As formas para onde olhas reagem e tocam notas, marimba à esquerda e sino à direita.</small></div>
+        </div>
+        <div class="row">
+          <span class="icon range"><kbd>1</kbd><span>–</span><kbd>4</kbd></span>
+          <div class="what">Esquema de cor
+            <small>Muda a qualquer momento, com uma transição suave. Experimenta já aqui.</small></div>
+          <div class="schemes" id="schemes"></div>
+        </div>
+        <div class="row">
+          <span class="icon"><kbd>Esc</kbd></span>
+          <div class="what">Soltar o rato
+            <small>Clica no ecrã para voltar a olhar.</small></div>
+        </div>
+      </section>
+
+      <button id="start" disabled>A carregar</button>
+      <div id="hint">
+        <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+          <path d="M2 9V8a6 6 0 0 1 12 0v1"/><rect x="1" y="8.5" width="3" height="4.5" rx="1"/><rect x="12" y="8.5" width="3" height="4.5" rx="1"/>
+        </svg>
+        <span>Melhor com auscultadores</span>
+      </div>
+    </div>
   </div>
   <button id="lock" hidden>Clica para voltar a olhar com o rato</button>
+  <div id="toast" role="status" aria-live="polite"><span class="dot"></span><span class="label"></span></div>
   <div id="hud" hidden></div>
   <script type="module" src="/src/main.js"></script>
 </body>

@@ -13,7 +13,7 @@ const WHITE_NAMES = ['Dark', 'Hex', 'Points', 'Poles', 'Pulse', 'Pyramids', 'Tra
 const BACKGROUND_NAMES = ['Body', 'Fog', 'Floor'];
 
 function scheme(name, o) {
-  const s = { name, accentGain: o.accentGain, backgroundGain: o.backgroundGain, glowGain: o.glowGain, colours: {} };
+  const s = { name, label: o.label, swatch: o.swatch, accentGain: o.accentGain, backgroundGain: o.backgroundGain, glowGain: o.glowGain, colours: {} };
   if (o.colours) for (const [k, v] of Object.entries(o.colours)) s.colours[k] = srgb(v);
   if (o.white) for (const k of WHITE_NAMES) s.colours[k] = srgb(o.white);
   s.background = o.background ? srgb(o.background) : null;
@@ -25,8 +25,9 @@ function scheme(name, o) {
 
 export const SCHEMES = [
   // Original, mais intenso: as mesmas cores, acentos e fundo mais fortes, um azul ténue no céu.
-  scheme('Original', { accentGain: 1.3, backgroundGain: 3, glowGain: 1.4, base: '1E3C8C', baseLevel: 0.05, ambient: '0A1A40', ambientLevel: 0.6 }),
+  scheme('Original', { label: 'Ciano · magenta', swatch: ['0A1A40', '00DAFF', 'FF58CE'], accentGain: 1.3, backgroundGain: 3, glowGain: 1.4, base: '1E3C8C', baseLevel: 0.05, ambient: '0A1A40', ambientLevel: 0.6 }),
   scheme('Esmeralda', {
+    label: 'Verde-água', swatch: ['062C30', '19E6C8', '46FF5A'],
     accentGain: 1.35, backgroundGain: 1, glowGain: 1.5, background: '052A2D', glow: '19C8A0', base: '0A5A5A', baseLevel: 0.14, ambient: '0A5A5A', ambientLevel: 0.4,
     white: 'E6FFF5',
     colours: {
@@ -38,6 +39,7 @@ export const SCHEMES = [
     },
   }),
   scheme('Néon', {
+    label: 'Magenta · violeta', swatch: ['320A46', 'FF1EB4', '8C3CFF'],
     accentGain: 1.35, backgroundGain: 1, glowGain: 1.5, background: '320A46', glow: 'C828DC', base: '501470', baseLevel: 0.14, ambient: '501470', ambientLevel: 0.4,
     white: 'FFE6FF',
     colours: {
@@ -49,6 +51,7 @@ export const SCHEMES = [
     },
   }),
   scheme('Cidade', {
+    label: 'Âmbar · magenta', swatch: ['5A2D05', 'FFB41E', 'FF2896'],
     accentGain: 1.35, backgroundGain: 1, glowGain: 1.5, background: '5A2D05', glow: 'FFA028', base: '784010', baseLevel: 0.14, ambient: '784010', ambientLevel: 0.4,
     white: 'FFF0D2',
     colours: {
@@ -84,6 +87,7 @@ class Theme {
     this.target = 0;
     this.start = -Infinity;
     this.index = 0;
+    this.listeners = [];
   }
   select(index, now = performance.now() / 1000) {
     if (!SCHEMES[index] || index === this.index) return;
@@ -92,7 +96,9 @@ class Theme {
     this.target = index;
     this.start = now;
     this.index = index;
+    for (const f of this.listeners) f(index);
   }
+  onChange(f) { this.listeners.push(f); }
   // Chamar uma vez por frame, antes de desenhar.
   update(now = performance.now() / 1000) {
     const x = Math.min(Math.max((now - this.start) / TRANSITION_SECONDS, 0), 1), k = x * x * (3 - 2 * x);

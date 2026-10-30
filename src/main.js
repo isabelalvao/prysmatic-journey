@@ -123,7 +123,6 @@ async function preload() {
     progress('warm', 1, 'Pronto.');
     start.disabled = false;
     start.textContent = 'Começar';
-    hint.textContent = 'Usa auscultadores. Move o rato para olhar; Esc liberta o rato.';
   } catch (e) {
     console.error(e);
     status.textContent = `Não foi possível carregar: ${e.message}`;
@@ -155,6 +154,36 @@ start.addEventListener('click', async () => {
   audio.play(Number(params.get('t')) || 0);
   canvas.requestPointerLock?.();
 });
+// ---- esquemas de cor: amostras no ecrã inicial e etiqueta breve durante a experiência ----
+const schemeButtons = SCHEMES.map((s, i) => {
+  const b = document.createElement('button');
+  b.className = 'scheme';
+  b.type = 'button';
+  b.style.setProperty('--bg', '#' + s.swatch[0]); b.style.setProperty('--c1', '#' + s.swatch[1]); b.style.setProperty('--c2', '#' + s.swatch[2]);
+  b.innerHTML = `<span class="swatch"></span><span class="name"><kbd>${i + 1}</kbd>${s.name}</span><span class="tone">${s.label}</span>`;
+  b.setAttribute('aria-label', `Esquema ${i + 1}: ${s.name}, ${s.label}`);
+  b.addEventListener('click', () => theme.select(i));
+  $('schemes').append(b);
+  return b;
+});
+const toast = $('toast');
+let toastTimer = 0;
+function showScheme(index, announce) {
+  const s = SCHEMES[index];
+  schemeButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === index)));
+  // O ecrã inicial (barra, botão, brilho de fundo) acompanha o esquema.
+  document.documentElement.style.setProperty('--accent', '#' + s.swatch[1]);
+  document.documentElement.style.setProperty('--accent2', '#' + s.swatch[2]);
+  if (!announce) return;
+  toast.style.setProperty('--c1', '#' + s.swatch[1]); toast.style.setProperty('--c2', '#' + s.swatch[2]);
+  toast.querySelector('.label').textContent = `${index + 1} · ${s.name}`;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+theme.onChange((i) => showScheme(i, overlay.hidden));
+showScheme(theme.index, false);
+
 window.addEventListener('keydown', (e) => {
   // Teclas 1–4: esquema de cor, com transição de 4 s.
   const scheme = /^(Digit|Numpad)([1-4])$/.exec(e.code);
@@ -176,7 +205,7 @@ function frame() {
   if (t >= world.playbackEnd || audio.ended()) {
     if (!ended) {
       ended = true; audio.stop(); document.exitPointerLock?.();
-      overlay.hidden = false; status.textContent = 'Fim.'; start.textContent = 'Recomeçar'; hint.textContent = '';
+      overlay.hidden = false; status.textContent = 'Fim.'; start.textContent = 'Recomeçar';
       $('lock').hidden = true;
     }
     t = world.playbackEnd - 1e-3;
