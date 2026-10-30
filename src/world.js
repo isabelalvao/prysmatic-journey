@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import * as D from './direction.js';
 import * as SH from './shaders.gen.js';
+import { theme } from './theme.js';
 
 const { Role, Stage } = D;
 const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
@@ -237,7 +238,7 @@ export class World {
   // Uniforms comuns a todo o frame (scene_uniforms + dots_uniforms, a parte que não depende do desenho).
   frameUniforms(state, time, camera) {
     const S = this.S, C = this.C, comp = this.comp, sh = this.shared, beats = this.data.beats;
-    const fog = this.ringColour(comp.atmosphere, time);
+    const fog = this.ringColour(theme.apply(comp.atmosphere), time);
     sh.u_atmosphere.value.set(fog[0], fog[1], fog[2], comp.exposure);
     D.visualUniforms(C, this.motion(time), time, comp.directed_extension, sh.u_tuning.value);
     sh.u_layout.value.set(comp.geometry_density_multiplier, 25, comp.previous_exit_progress, 0);
@@ -643,7 +644,8 @@ export class World {
   render(time, look, gaze) {
     const S = this.S, renderer = this.renderer;
     const comp = this.comp = D.directedComposition(time, S, this.playbackEnd);
-    const state = D.directedVisualParameters({ ...this.C.parameters, palette: this.C.parameters.palette }, time, this.C);
+    theme.update();
+    const state = D.directedVisualParameters({ ...this.C.parameters, palette: this.C.parameters.palette.map((c) => theme.apply(c)) }, time, this.C);
     const camera = D.directedCameraPosition(time, S);
     this.camPos = camera;
     this.choreo = {

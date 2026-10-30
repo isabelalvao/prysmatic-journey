@@ -1,5 +1,6 @@
 // Dados exportados por tools/exporter/web_export.cpp: configuração resolvida, malhas em pontos, instâncias e graves.
 import { Role } from './direction.js';
+import { theme } from './theme.js';
 
 export class Beats {
   constructor(envelope, onsets, duration) { this.envelope = envelope; this.onsets = onsets; this.duration = duration; }
@@ -28,7 +29,7 @@ export function parseScene(manifest, buffer) {
   const C = {
     S,
     colours: manifest.colours,
-    colour: (name) => manifest.colours[name],
+    colour: (name) => theme.apply(manifest.colours[name]),   // com o esquema de cor escolhido (teclas 1–4)
     families: manifest.families,
     parameters: manifest.parameters,
   };

@@ -5,6 +5,7 @@ import { parseScene } from './data.js';
 import { World } from './world.js';
 import { Gaze } from './gaze.js';
 import { AudioEngine, ChordMap, PointMusic } from './audio.js';
+import { theme, SCHEMES } from './theme.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
@@ -155,6 +156,9 @@ start.addEventListener('click', async () => {
   canvas.requestPointerLock?.();
 });
 window.addEventListener('keydown', (e) => {
+  // Teclas 1–4: esquema de cor, com transição de 4 s.
+  const scheme = /^(Digit|Numpad)([1-4])$/.exec(e.code);
+  if (scheme) { theme.select(Number(scheme[2]) - 1); return; }
   if (!started || !DEBUG) return;
   if (e.code === 'Space') { audio.playing ? audio.pause() : audio.play(audio.offset); e.preventDefault(); }
   if (e.code === 'ArrowRight') { audio.seek(audio.graphSeconds() + 10); music.reset(); }
@@ -181,12 +185,12 @@ function frame() {
   if (!ended) audio.playNotes(music.update(audio.graphSeconds(), world.forward, gaze.active(now / 1000)));
   ++frames;
   if (now - fpsTime > 500) { fps = frames * 1000 / (now - fpsTime); frames = 0; fpsTime = now; }
-  if (DEBUG) hud.textContent = `t ${t.toFixed(2)} s · ${fps.toFixed(0)} fps · ${world.drawCount()} desenhos · ${gaze.profile.describe()}`;
+  if (DEBUG) hud.textContent = `t ${t.toFixed(2)} s · ${fps.toFixed(0)} fps · ${world.drawCount()} desenhos · ${SCHEMES[theme.index].name} · ${gaze.profile.describe()}`;
 }
 
 // Modo de captura (testes): ?capture=t1,t2,… desenha esses tempos sem música nem interação.
 window.__silentOrbit = {
-  get world() { return world; }, get gaze() { return gaze; }, get audio() { return audio; }, THREE,
+  theme, get world() { return world; }, get gaze() { return gaze; }, get audio() { return audio; }, THREE,
   ready: () => !!world && !start.disabled,
   renderAt: (t, yaw = 0, pitch = 0, gazeOn = false) => {
     look.yaw = yaw; look.pitch = pitch;
