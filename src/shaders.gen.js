@@ -908,6 +908,7 @@ uniform vec4 u_color1;
 uniform vec4 u_eye;
 uniform vec4 u_style;
 uniform vec4 u_atmosphere;
+uniform vec4 u_theme;
 uniform vec4 u_art;
 uniform vec4 u_tuning[22];
 uniform vec4 u_choreography[7];
@@ -1069,6 +1070,7 @@ void main()
             +mix(u_color0.xyz,u_color1.xyz,halo)*clouds*0.006*u_scene.z;
         color+=(atmosphere+u_atmosphere.xyz*halo*0.10)*u_scene.x*u_post.z*u_choreography[3].x*glowGain;
     }
+    color+=u_theme.xyz*(0.2+0.8*pow(1.0-abs(direction.y),3.0))*mix(1.0,empty,u_theme.w)*u_scene.x;
     color *= u_tuning[14].y;
     if(u_tuning[14].w>0.5) color = (color*(2.51*color+0.03))/(color*(2.43*color+0.59)+0.14);
     color=clamp(color,0.0,1.0);

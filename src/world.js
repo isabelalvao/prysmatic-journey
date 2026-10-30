@@ -203,7 +203,7 @@ export class World {
     this.extract = post(SH.fs_extract, { s_source: { value: null } });
     this.blur = [0, 1].map(() => post(SH.fs_blur, { s_source: { value: null }, u_blur: { value: new THREE.Vector4() } }));
     this.composite = post(SH.fs_composite, {
-      ...this.shared, s_source: { value: null }, s_bloom: { value: null }, u_post: { value: new THREE.Vector4() }, u_sky: { value: new THREE.Matrix4() },
+      ...this.shared, s_source: { value: null }, s_bloom: { value: null }, u_post: { value: new THREE.Vector4() }, u_sky: { value: new THREE.Matrix4() }, u_theme: { value: new THREE.Vector4() },
       u_scene: { value: new THREE.Vector4() }, u_clock: { value: new THREE.Vector4() }, u_color0: { value: new THREE.Vector4() },
       u_color1: { value: new THREE.Vector4() }, u_style: { value: new THREE.Vector4() }, u_art: { value: new THREE.Vector4() },
       u_constellation: { value: new Float32Array(200) }, u_rain: { value: new Float32Array(16) }, u_timer: { value: new Float32Array(20) },
@@ -238,7 +238,7 @@ export class World {
   // Uniforms comuns a todo o frame (scene_uniforms + dots_uniforms, a parte que não depende do desenho).
   frameUniforms(state, time, camera) {
     const S = this.S, C = this.C, comp = this.comp, sh = this.shared, beats = this.data.beats;
-    const fog = this.ringColour(theme.apply(comp.atmosphere), time);
+    const fog = this.ringColour(theme.apply(comp.atmosphere, 'atmosphere'), time);
     sh.u_atmosphere.value.set(fog[0], fog[1], fog[2], comp.exposure);
     D.visualUniforms(C, this.motion(time), time, comp.directed_extension, sh.u_tuning.value);
     sh.u_layout.value.set(comp.geometry_density_multiplier, 25, comp.previous_exit_progress, 0);
@@ -645,7 +645,7 @@ export class World {
     const S = this.S, renderer = this.renderer;
     const comp = this.comp = D.directedComposition(time, S, this.playbackEnd);
     theme.update();
-    const state = D.directedVisualParameters({ ...this.C.parameters, palette: this.C.parameters.palette.map((c) => theme.apply(c)) }, time, this.C);
+    const state = D.directedVisualParameters({ ...this.C.parameters, palette: this.C.parameters.palette.map((c, i) => theme.apply(c, 'palette' + i)) }, time, this.C);
     const camera = D.directedCameraPosition(time, S);
     this.camPos = camera;
     this.choreo = {
@@ -725,6 +725,7 @@ export class World {
     sky[15] = 1;
     cu.u_sky.value.fromArray(sky);
     cu.u_post.value.set(state.bloom, 0, comp.weights[2], comp.weights[1]);
+    theme.ambient(cu.u_theme.value);
     cu.s_source.value = this.sceneTarget.texture; cu.s_bloom.value = this.blurTargets[2].texture;
     this.rainUniforms(time, cu.u_rain.value);
     this.fullScreen(this.composite, null);

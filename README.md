@@ -9,7 +9,7 @@ Versão para o browser do PC do `Fantasynt-SilentOrbit-Synth.cmd` do Prismatic-P
 
 O ecrã inicial carrega tudo antes de deixar começar: geometria e instâncias (`scene.bin`, 4,5 MB), a música (Opus 9,8 MB, ou AAC no Safari) já descodificada, as texturas e os shaders, que são compilados ao desenhar por trás do ecrã de carregamento um momento de cada fase da obra. Só então aparece o botão **Começar**, que inicia o áudio.
 
-Controlo: mover o rato olha à volta (vertical limitado a ±80°); clicar volta a prender o rato depois de `Esc`. As teclas `1` a `4` mudam o esquema de cor (Original, Âmbar, Esmeralda, Prata), com uma transição de 4 s; cada esquema roda o matiz e ajusta a saturação de todas as cores da configuração, mantendo as relações entre elas. Usar auscultadores: as notas vêm da direção para onde se olha (HRTF).
+Controlo: mover o rato olha à volta (vertical limitado a ±80°); clicar volta a prender o rato depois de `Esc`. As teclas `1` a `4` mudam o esquema de cor, com uma transição de 4 s: `1` Original (mais intenso), `2` Esmeralda (verde-água néon), `3` Néon (magenta e violeta), `4` Cidade (âmbar com acentos magenta). Cada esquema dá cor própria a cones, cristais, anéis, cometas, nevoeiro, céu e fundo (`src/theme.js`), e a composição junta uma luz de fundo na cor do esquema. Usar auscultadores: as notas vêm da direção para onde se olha (HRTF).
 
 Opções de URL para testar: `?debug` mostra tempo, fps, desenhos e o episódio da resposta, e ativa `Espaço` (pausa) e `←`/`→` (±10 s); `?t=120` começa aos 120 s; `?scale=1` fixa a resolução interna (por omissão segue o ecrã, até 2×).
 

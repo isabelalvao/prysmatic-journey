@@ -29,7 +29,7 @@ export function parseScene(manifest, buffer) {
   const C = {
     S,
     colours: manifest.colours,
-    colour: (name) => theme.apply(manifest.colours[name]),   // com o esquema de cor escolhido (teclas 1–4)
+    colour: (name) => theme.apply(manifest.colours[name], name),   // com o esquema de cor escolhido (teclas 1–4)
     families: manifest.families,
     parameters: manifest.parameters,
   };

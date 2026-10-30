@@ -115,6 +115,11 @@ def main():
     c = c.replace('((u_sky)*(vec4(v_uv*2.0-1.0,1.0,0.0)))', '((u_sky)*(vec4(v_d3d*2.0-1.0,1.0,0.0)))')
     c = c.replace('length((v_uv-0.5)*u_tuning[15].w)', 'length((v_d3d-0.5)*u_tuning[15].w)')
     c = c.replace('timer_overlay(color*vignette,v_uv)', 'color*vignette')
+    # Esquemas de cor (teclas 1–4): luz ambiente do fundo na cor do esquema, só onde a cena está vazia.
+    c = c.replace('uniform vec4 u_atmosphere;', 'uniform vec4 u_atmosphere;\nuniform vec4 u_theme;')
+    c = c.replace('    color *= u_tuning[14].y;',
+                  '    color+=u_theme.xyz*(0.2+0.8*pow(1.0-abs(direction.y),3.0))*mix(1.0,empty,u_theme.w)*u_scene.x;\n    color *= u_tuning[14].y;')
+    assert 'u_theme.xyz' in c
     shaders['fs_composite'] = c
     shaders['vs_quad'] = '''precision highp float;
 in vec3 a_position;
