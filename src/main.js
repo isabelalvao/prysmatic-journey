@@ -11,7 +11,7 @@ const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
 const BASE = import.meta.env.BASE_URL;
 const $ = (id) => document.getElementById(id);
-const overlay = $('overlay'), bar = $('bar'), status = $('status'), start = $('start'), hint = $('hint'), hud = $('hud');
+const overlay = $('overlay'), controls = $('controls'), status = $('status'), start = $('start'), hint = $('hint'), hud = $('hud');
 
 // ---- preload ----
 async function fetchWithProgress(url, onProgress) {
@@ -62,7 +62,7 @@ function progress(key, fraction, text) {
   done[key] = Math.min(Math.max(fraction, 0), 1);
   let sum = 0, all = 0;
   for (const [k, w] of Object.entries(weights)) { all += w; sum += (done[k] || 0) * w; }
-  bar.style.width = `${(100 * sum / all).toFixed(1)}%`;
+  controls.style.setProperty('--p', (sum / all).toFixed(4));
   if (text) status.textContent = text;
 }
 

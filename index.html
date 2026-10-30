@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Silent Orbit</title>
+  <title>Prysmatic Journey</title>
   <style>
     :root {
       --ink: #e4e8ef; --muted: #8a92a0; --faint: #5a6270; --line: #232833; --panel: rgba(255, 255, 255, 0.025);
@@ -20,15 +20,19 @@
       transition: background 0.8s ease; }
     .card { margin: auto; width: min(460px, 100%); display: flex; flex-direction: column; align-items: center; gap: 22px; }
     h1 { font-weight: 300; letter-spacing: 0.42em; text-transform: uppercase; font-size: 22px; margin: 0 0 0 0.42em; }
-    .sub { margin: -14px 0 0; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
-    .track { width: 100%; height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
-    #bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.15s linear; }
-    #status { font-size: 13px; color: var(--muted); min-height: 1.5em; text-align: center; margin-top: -12px; }
+    /* A borda da caixa é a barra de carregamento: enche-se da esquerda para a direita nas cores do esquema. */
+    .controls { position: relative; border: 0 !important; --p: 0; }
+    .controls::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+      background: linear-gradient(90deg, var(--accent), var(--accent2)) 0 0 / calc(var(--p) * 100%) 100% no-repeat, var(--line);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+      mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); transition: background-size 0.2s linear; }
+    .controls .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    #status { font-size: 11.5px; color: var(--faint); letter-spacing: 0.04em; text-align: right; }
 
     .controls { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 6px 18px; }
     .controls h2 { font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); margin: 12px 0 2px; }
     .row { display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
-    .controls h2 + .row { border-top: 0; }
+    .controls .head + .row { border-top: 0; }
     .row .what { font-size: 14px; }
     .row .what small { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
     .icon { justify-self: center; color: var(--ink); opacity: 0.85; }
@@ -69,11 +73,11 @@
     #hud { position: fixed; left: 8px; top: 6px; z-index: 1; font: 11px/1.4 ui-monospace, monospace; color: #9aa3b0; white-space: pre; pointer-events: none; }
     /* Ecrãs baixos: tudo cabe sem deslocar a página. */
     @media (max-height: 760px) {
-      .card { gap: 14px; } .sub { margin-top: -10px; } #status { margin-top: -8px; } #hint { margin-top: -6px; }
+      .card { gap: 14px; } #hint { margin-top: -6px; }
       .controls h2 { margin-top: 9px; } .row { padding: 8px 0; } .row .what small { line-height: 1.35; }
       .swatch { aspect-ratio: 16 / 7; } .scheme { padding: 6px 4px; gap: 5px; } .scheme .tone { display: none; }
     }
-    @media (max-height: 600px) { .sub { display: none; } .row .what small { font-size: 12px; } h1 { font-size: 19px; } }
+    @media (max-height: 600px) { .row .what small { font-size: 12px; } h1 { font-size: 19px; } }
     @media (prefers-reduced-motion: reduce) { #toast, #overlay, .scheme { transition: none; } }
   </style>
 </head>
@@ -81,13 +85,10 @@
   <canvas id="scene"></canvas>
   <div id="overlay">
     <div class="card">
-      <h1>Silent Orbit</h1>
-      <p class="sub">uma viagem guiada pelo olhar</p>
-      <div class="track"><div id="bar"></div></div>
-      <div id="status">A carregar…</div>
+      <h1>Prysmatic Journey</h1>
 
-      <section class="controls" aria-label="Controlos">
-        <h2>Controlos</h2>
+      <section class="controls" id="controls" aria-label="Controlos">
+        <div class="head"><h2>Controlos</h2><span id="status" role="status">A carregar…</span></div>
         <div class="row">
           <svg class="icon" width="22" height="32" viewBox="0 0 22 32" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
             <rect x="1.5" y="1.5" width="19" height="29" rx="9.5"/><line x1="11" y1="6" x2="11" y2="11" stroke-linecap="round"/>
