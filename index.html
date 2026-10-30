@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Silent Orbit</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; color: #d8dde6; font: 15px/1.5 system-ui, sans-serif; overflow: hidden; }
+    canvas { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: none; }
+    #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #000; z-index: 2; }
+    #overlay[hidden], #lock[hidden], #hud[hidden] { display: none; }
+    h1 { font-weight: 300; letter-spacing: 0.35em; text-transform: uppercase; font-size: 22px; margin: 0; }
+    .track { width: min(360px, 70vw); height: 2px; background: #1c2027; }
+    #bar { height: 100%; width: 0; background: #d8dde6; transition: width 0.15s linear; }
+    #status, #hint { font-size: 13px; color: #8a92a0; min-height: 1.5em; text-align: center; padding: 0 16px; }
+    button { background: none; color: #d8dde6; border: 1px solid #5a6270; padding: 8px 28px; font: inherit; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; }
+    button:disabled { opacity: 0.35; cursor: default; }
+    button:not(:disabled):hover { border-color: #d8dde6; }
+    #lock { position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); z-index: 1; font-size: 12px; }
+    #hud { position: fixed; left: 8px; top: 6px; z-index: 1; font: 11px/1.4 ui-monospace, monospace; color: #9aa3b0; white-space: pre; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="overlay">
+    <h1>Silent Orbit</h1>
+    <div class="track"><div id="bar"></div></div>
+    <div id="status">A carregar…</div>
+    <button id="start" disabled>A carregar</button>
+    <div id="hint"></div>
+  </div>
+  <button id="lock" hidden>Clica para voltar a olhar com o rato</button>
+  <div id="hud" hidden></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

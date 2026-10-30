@@ -1,0 +1,1 @@
+static const char* colour_names[]={"Body","Fog","Floor","Dark","Hex","Trace","Pulse","Pyramids","Points","Poles","WarmFirst","WarmSecond","CoolFirst","CoolSecond","ConeCyan","ConeMagenta","CrystalCyan","CrystalViolet","TunnelGlow","RingEven","RingOdd","ConeBlue","ConeWhite","ConeViolet","ConeGold"};
