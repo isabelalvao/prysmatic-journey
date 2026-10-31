@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "quest": "vite build && vite preview --mode quest"
   },
   "dependencies": {
     "three": "0.187.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "1.2.0",
     "vite": "6.0.7"
   }
 }

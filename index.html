@@ -56,10 +56,12 @@
     .scheme[aria-pressed="true"] .name kbd { border-color: color-mix(in srgb, var(--c1) 60%, #343a46); }
     .scheme .tone { font-size: 11px; line-height: 1.3; color: var(--faint); margin-top: -4px; text-align: center; }
 
-    #start { all: unset; cursor: pointer; padding: 10px 34px; font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink);
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    #start, #vr { all: unset; cursor: pointer; padding: 10px 34px; font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink);
       border: 1px solid #4a5260; border-radius: 999px; transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s; }
-    #start:disabled { opacity: 0.35; cursor: default; }
-    #start:not(:disabled):hover, #start:not(:disabled):focus-visible { border-color: var(--accent); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+    #start:disabled, #vr:disabled { opacity: 0.35; cursor: default; }
+    #vr { border-color: color-mix(in srgb, var(--accent2) 45%, #4a5260); }
+    #start:not(:disabled):hover, #start:not(:disabled):focus-visible, #vr:not(:disabled):hover, #vr:not(:disabled):focus-visible { border-color: var(--accent); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
     #hint { font-size: 12px; color: var(--faint); text-align: center; margin-top: -10px; display: flex; align-items: center; gap: 8px; }
 
     /* ---- durante a experiência ---- */
@@ -109,7 +111,10 @@
         </div>
       </section>
 
-      <button id="start" disabled>A carregar</button>
+      <div class="actions">
+        <button id="start" disabled>A carregar</button>
+        <button id="vr" hidden disabled>Entrar em VR</button>
+      </div>
       <div id="hint">
         <svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
           <path d="M2 9V8a6 6 0 0 1 12 0v1"/><rect x="1" y="8.5" width="3" height="4.5" rx="1"/><rect x="12" y="8.5" width="3" height="4.5" rx="1"/>

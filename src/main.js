@@ -6,6 +6,9 @@ import { World } from './world.js';
 import { Gaze } from './gaze.js';
 import { AudioEngine, ChordMap, PointMusic } from './audio.js';
 import { theme, SCHEMES } from './theme.js';
+import { Hands } from './hands.js';
+import { HandVisuals, snapNote, snapVelocity } from './handvisuals.js';
+import { XRPresenter } from './xr.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
@@ -73,7 +76,7 @@ renderer.toneMapping = THREE.NoToneMapping;
 renderer.autoClear = false;
 const scale = Number(params.get('scale')) || Math.min(window.devicePixelRatio || 1, 2);
 
-let world, gaze, audio, music, data;
+let world, gaze, audio, music, data, hands, xr, chordMap, handVisuals;
 const look = { yaw: 0, pitch: 0 };
 
 function size() {
@@ -107,7 +110,9 @@ async function preload() {
     data = parseScene(manifest, scene);
     world = new World(renderer, data, textures);
     gaze = new Gaze(data.C.S);
-    music = new PointMusic(new ChordMap(chords));
+    chordMap = new ChordMap(chords);
+    music = new PointMusic(chordMap);
+    xr = new XRPresenter(renderer, data.C.S);
     size();
     progress('build', 1, 'A compilar os shaders…');
     // Aquecimento: desenhar momentos de todas as fases cria os materiais, as instâncias e os programas
@@ -123,6 +128,8 @@ async function preload() {
     progress('warm', 1, 'Pronto.');
     start.disabled = false;
     start.textContent = 'Começar';
+    // VR só aparece quando o browser tem WebXR immersive-vr (Quest Browser, ou PC com óculos ligado).
+    if (await XRPresenter.supported()) { vrButton.hidden = false; vrButton.disabled = false; }
   } catch (e) {
     console.error(e);
     status.textContent = `Não foi possível carregar: ${e.message}`;
@@ -144,6 +151,50 @@ document.addEventListener('pointerlockchange', () => {
 });
 canvas.addEventListener('click', () => { if (started && !ended) canvas.requestPointerLock?.({ unadjustedMovement: true })?.catch?.(() => canvas.requestPointerLock()); });
 $('lock').addEventListener('click', () => canvas.requestPointerLock());
+
+// ---- VR (WebXR): as mãos fazem o que o olhar faz no ecrã ----
+const vrButton = $('vr');
+const VR_SCALE = Math.min(Math.max(Number(params.get('vrscale')) || 0.75, 0.4), 1);
+async function startVR() {
+  await audio.ctx.resume();
+  hands = new Hands(data.C.S, chordMap, { echo: true });
+  handVisuals ??= new HandVisuals(data.C.S, world);
+  const at = ended ? 0 : (started ? audio.graphSeconds() : Number(params.get('t')) || 0);
+  try {
+    await xr.enter({
+      scale: VR_SCALE,
+      onFrame: vrFrame,
+      onEnd: () => { handVisuals.hide(); audio.resetListener(); size(); $('lock').hidden = !started || ended; },
+    });
+  } catch (e) {
+    console.error(e);
+    status.textContent = `Não foi possível entrar em VR: ${e.message}`;
+    return;
+  }
+  overlay.hidden = true;
+  if (!started || ended) { started = true; ended = false; audio.play(at); }
+}
+vrButton.addEventListener('click', startVR);
+function vrFrame(frame, pose, centre, eyes, target) {
+  let t = audio.heardSeconds();
+  if (t >= world.playbackEnd || audio.ended()) {
+    if (!ended) { ended = true; audio.stop(); xr.end(); overlay.hidden = false; status.textContent = 'Fim.'; start.textContent = 'Recomeçar'; }
+    t = world.playbackEnd - 1e-3;
+  }
+  const [, , w, h] = eyes[0].viewport;
+  world.resize(w, h, 0);   // perfil VR: sem MSAA na cena, resolução do óculos × vrscale
+  hands.observe(frame, xr.space, pose);
+  world.prepare(t, centre, hands);
+  // Mãos de pontos, rasto e estalo com faíscas e som (como em --hand-snap --synth no original).
+  for (const s of handVisuals.update(hands.obs, t, (p) => hands.toWorld(p)))
+    if (!ended) audio.snap(s.hand, snapNote(s.hand, s.position[1] - hands.obs.head[1]), snapVelocity(s.closing), s.position);
+  for (const e of eyes) world.drawView(e, target, e.viewport);
+  const q = pose.transform.orientation, p = pose.transform.position;
+  const f = [-(2 * (q.x * q.z + q.w * q.y)), -(2 * (q.y * q.z - q.w * q.x)), -(1 - 2 * (q.x * q.x + q.y * q.y))];
+  const u = [2 * (q.x * q.y - q.w * q.z), 1 - 2 * (q.x * q.x + q.z * q.z), 2 * (q.y * q.z + q.w * q.x)];
+  audio.setListener([p.x, p.y, p.z], f, u);
+  if (!ended) audio.playNotes(hands.notes(audio.graphSeconds(), audio.playing));
+}
 
 start.addEventListener('click', async () => {
   await audio.ctx.resume();
@@ -193,13 +244,13 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'ArrowRight') { audio.seek(audio.graphSeconds() + 10); music.reset(); }
   if (e.code === 'ArrowLeft') { audio.seek(audio.graphSeconds() - 10); music.reset(); }
 });
-window.addEventListener('resize', size);
+window.addEventListener('resize', () => { if (!xr?.session) size(); });
 
 // ---- ciclo ----
 let frames = 0, fpsTime = performance.now(), fps = 0;
 function frame() {
   requestAnimationFrame(frame);
-  if (!world || !started) return;
+  if (!world || !started || xr?.session) return;
   const now = performance.now();
   let t = audio.heardSeconds();
   if (t >= world.playbackEnd || audio.ended()) {
@@ -219,7 +270,7 @@ function frame() {
 
 // Modo de captura (testes): ?capture=t1,t2,… desenha esses tempos sem música nem interação.
 window.__silentOrbit = {
-  theme, get world() { return world; }, get gaze() { return gaze; }, get audio() { return audio; }, THREE,
+  theme, get xr() { return xr; }, get hands() { return hands; }, get handVisuals() { return handVisuals; }, get world() { return world; }, get gaze() { return gaze; }, get audio() { return audio; }, THREE,
   ready: () => !!world && !start.disabled,
   renderAt: (t, yaw = 0, pitch = 0, gazeOn = false) => {
     look.yaw = yaw; look.pitch = pitch;

@@ -210,13 +210,15 @@ export class World {
     });
     this.width = 0; this.height = 0;
   }
-  resize(width, height) {
-    if (width === this.width && height === this.height) return;
+  // msaa: amostras da cena (undefined = PostMsaa da configuração; o perfil VR usa menos).
+  resize(width, height, msaa = undefined) {
+    if (width === this.width && height === this.height && msaa === this.msaa) return;
+    this.msaa = msaa;
     this.width = width; this.height = height;
     for (const t of [this.reflectionTarget, this.sceneTarget, ...(this.blurTargets || [])]) t?.dispose();
     const hdr = { type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping, colorSpace: THREE.NoColorSpace };
     this.reflectionTarget = new THREE.WebGLRenderTarget(width, height, { ...hdr, depthBuffer: true });
-    this.sceneTarget = new THREE.WebGLRenderTarget(width, height, { ...hdr, depthBuffer: true, samples: this.S.PostMsaa >= 2 ? Math.min(this.S.PostMsaa, 8) : 0 });
+    this.sceneTarget = new THREE.WebGLRenderTarget(width, height, { ...hdr, depthBuffer: true, samples: this.msaa ?? (this.S.PostMsaa >= 2 ? Math.min(this.S.PostMsaa, 8) : 0) });
     this.halfW = Math.max(1, width >> 1); this.halfH = Math.max(1, height >> 1);
     this.blurTargets = [0, 1, 2].map(() => new THREE.WebGLRenderTarget(this.halfW, this.halfH, { ...hdr, depthBuffer: false }));
   }
@@ -640,37 +642,41 @@ export class World {
     }
   }
 
-  // Um frame completo (Impl::draw no ecrã + draw_scene). look: {yaw, pitch} em radianos.
+  // Um frame completo no ecrã (Impl::draw + draw_scene). look: {yaw, pitch} em radianos.
   render(time, look, gaze) {
-    const S = this.S, renderer = this.renderer;
+    const S = this.S;
+    // Vista: olhos a eye_height, eye_back atrás do percurso; o rato roda a direção (mão esquerda, +z à frente).
+    const eye = [0, S.EyeHeight * 100, -S.EyeBack * 100];
+    const cp = Math.cos(look.pitch);
+    const forward = [Math.sin(look.yaw) * cp, Math.sin(look.pitch), Math.cos(look.yaw) * cp];
+    const view = lookAtLH(eye, [eye[0] + forward[0] * 3000, eye[1] + forward[1] * 3000, eye[2] + forward[2] * 3000]);
+    const comp = D.directedComposition(time, S, this.playbackEnd);
+    const projection = perspectiveLH(S.DesktopFov + comp.weights[2] * 12, this.width / this.height, S.NearPlane * 100, S.FarPlane * 100);
+    this.prepare(time, { eye, view, forward }, gaze);
+    this.drawView({ eye, view, projection }, null);
+  }
+
+  // Lógica de um frame (listas de desenho, uniforms partilhados), uma vez por frame também em VR:
+  // a ordenação da transparência usa a vista central (cabeça), que serve aos dois olhos.
+  prepare(time, centre, interaction) {
+    const S = this.S;
     const comp = this.comp = D.directedComposition(time, S, this.playbackEnd);
     theme.update();
-    const state = D.directedVisualParameters({ ...this.C.parameters, palette: this.C.parameters.palette.map((c, i) => theme.apply(c, 'palette' + i)) }, time, this.C);
+    const state = this.state = D.directedVisualParameters({ ...this.C.parameters, palette: this.C.parameters.palette.map((c, i) => theme.apply(c, 'palette' + i)) }, time, this.C);
     const camera = D.directedCameraPosition(time, S);
-    this.camPos = camera;
+    this.camPos = camera; this.time = time;
     this.choreo = {
       tube_start: S.TunnelStart, tube_build_seconds: S.TunnelFade, tube_piece_reveal_seconds: S.TunnelPieceReveal,
       generic_forms_reveal_seconds: S.GenericPieceReveal, segment_reveal_seconds: S.ConeSegmentReveal,
     };
     if (time < this.lastTime) { this.coneRates = [{ time: 0, angle: 0, rate: S.ConeRotation * S.AnimationSpeed * Math.PI / 180 }]; }
     this.lastTime = time;
-    // Vista: olhos a eye_height, eye_back atrás do percurso; o rato roda a direção (mão esquerda, +z à frente).
-    const height = S.EyeHeight * 100, back = S.EyeBack * 100;
-    const eye = [0, height, -back];
+    const eye = centre.eye;
     this.eyeOrigin = eye;
-    const cp = Math.cos(look.pitch);
-    const forward = [Math.sin(look.yaw) * cp, Math.sin(look.pitch), Math.cos(look.yaw) * cp];
-    const view = lookAtLH(eye, [eye[0] + forward[0] * 3000, eye[1] + forward[1] * 3000, eye[2] + forward[2] * 3000]);
-    const w = this.width, h = this.height;
-    const projection = perspectiveLH(S.DesktopFov + comp.weights[2] * 12, w / h, S.NearPlane * 100, S.FarPlane * 100);
-    this.eyeView.set(view);
-    this.forward = forward;
-    const sh = this.shared;
-    sh.u_view.value.fromArray(view); sh.u_proj.value.fromArray(projection);
-    sh.u_viewProj.value.multiplyMatrices(sh.u_proj.value, sh.u_view.value);
-    sh.u_viewRect.value.set(0, 0, w, h);
-    sh.u_eye.value.set(eye[0], eye[1], eye[2], 0);
-    gaze?.apply(this, eye, forward, time, camera);
+    this.eyeView.set(centre.view);
+    this.forward = centre.forward;
+    this.shared.u_eye.value.set(eye[0], eye[1], eye[2], 0);
+    interaction?.apply(this, eye, centre.forward, time, camera);
     this.updateComets(state, time, camera);
     this.frameUniforms(state, time, camera);
     // Começa a lista de desenhos.
@@ -698,10 +704,28 @@ export class World {
       this.submit(1, 'ground', 'ground', floor, 0, 1, u, blend, !blend);
     }
     this.flushTransparency(state, time, camera);
+    this.extras?.(this, time, camera);
+    // Composição: o que não depende do olho.
+    const cu = this.composite.uniforms, u = this.drawUniforms(state, time, camera, false);
+    cu.u_scene.value.fromArray(u.scene); cu.u_clock.value.fromArray(u.clock); cu.u_color0.value.fromArray(u.color0);
+    cu.u_color1.value.fromArray(u.color1); cu.u_style.value.fromArray(u.style); cu.u_art.value.fromArray(u.art);
+    cu.u_post.value.set(state.bloom, 0, comp.weights[2], comp.weights[1]);
+    theme.ambient(cu.u_theme.value);
+    this.rainUniforms(time, cu.u_rain.value);
+  }
+
+  // Desenha a cena preparada para um olho (ou para o ecrã): view/projection de mão esquerda com profundidade
+  // homogénea, eye em cm. output: alvo final (null = ecrã); viewport opcional [x, y, w, h] dentro dele.
+  drawView(v, output, viewport = null) {
+    const renderer = this.renderer, sh = this.shared, { view, projection, eye } = v;
+    sh.u_view.value.fromArray(view); sh.u_proj.value.fromArray(projection);
+    sh.u_viewProj.value.multiplyMatrices(sh.u_proj.value, sh.u_view.value);
+    sh.u_viewRect.value.set(0, 0, this.width, this.height);
+    sh.u_eye.value.set(eye[0], eye[1], eye[2], 0);
     // Vistas 0 e 1.
     renderer.setRenderTarget(this.reflectionTarget);
     renderer.setClearColor(0x000000, 1); renderer.clear(true, true, false);
-    renderer.render(this.scenes[0], this.camera);
+    if (this.reflections !== false) renderer.render(this.scenes[0], this.camera);
     renderer.setRenderTarget(this.sceneTarget);
     renderer.clear(true, true, false);
     renderer.render(this.scenes[1], this.camera);
@@ -713,9 +737,7 @@ export class World {
     this.blur[1].uniforms.s_source.value = this.blurTargets[1].texture; this.blur[1].uniforms.u_blur.value.set(0, 1 / this.halfH, 0, 0);
     this.fullScreen(this.blur[1], this.blurTargets[2]);
     // Composição: céu preso ao mundo, chuva, exposição, ACES, gama e vinheta.
-    const cu = this.composite.uniforms, u = this.drawUniforms(state, time, camera, false);
-    cu.u_scene.value.fromArray(u.scene); cu.u_clock.value.fromArray(u.clock); cu.u_color0.value.fromArray(u.color0);
-    cu.u_color1.value.fromArray(u.color1); cu.u_style.value.fromArray(u.style); cu.u_art.value.fromArray(u.art);
+    const cu = this.composite.uniforms;
     const sky = new Array(16).fill(0);
     for (let i = 0; i < 3; ++i) {
       sky[i] = view[i * 4] / projection[0];
@@ -724,11 +746,9 @@ export class World {
     }
     sky[15] = 1;
     cu.u_sky.value.fromArray(sky);
-    cu.u_post.value.set(state.bloom, 0, comp.weights[2], comp.weights[1]);
-    theme.ambient(cu.u_theme.value);
     cu.s_source.value = this.sceneTarget.texture; cu.s_bloom.value = this.blurTargets[2].texture;
-    this.rainUniforms(time, cu.u_rain.value);
-    this.fullScreen(this.composite, null);
+    if (output && viewport) output.viewport.set(viewport[0], viewport[1], viewport[2], viewport[3]);
+    this.fullScreen(this.composite, output);
   }
   fullScreen(material, target) {
     this.quad.material = material;

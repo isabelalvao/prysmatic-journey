@@ -85,6 +85,7 @@ export class AudioEngine {
     // Volume do som interativo face à música (0,6 ≈ -4,4 dB, pedido do João a 2026-10-30).
     this.synthVolume = new GainNode(ctx, { gain: 0.6 });
     pre.connect(shaper).connect(this.synthVolume).connect(ctx.destination);
+    this.pre = pre;
     this.panners = [0, 1].map((i) => {
       const p = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: SOURCE_DISTANCE_M, rolloffFactor: 1 });
       this.synth.connect(p, i);
@@ -96,6 +97,16 @@ export class AudioEngine {
     if (l.forwardX) { l.forwardX.value = 0; l.forwardY.value = 0; l.forwardZ.value = -1; l.upX.value = 0; l.upY.value = 1; l.upZ.value = 0; }
     else l.setOrientation(0, 0, -1, 0, 1, 0);
   }
+  // Em VR o ouvinte segue a cabeça (posição e orientação no espaço local do WebXR), como no HandSynth.
+  setListener(position, forward, up) {
+    const l = this.ctx.listener, t = this.ctx.currentTime;
+    if (l.positionX) {
+      l.positionX.setTargetAtTime(position[0], t, 0.01); l.positionY.setTargetAtTime(position[1], t, 0.01); l.positionZ.setTargetAtTime(position[2], t, 0.01);
+      l.forwardX.setTargetAtTime(forward[0], t, 0.01); l.forwardY.setTargetAtTime(forward[1], t, 0.01); l.forwardZ.setTargetAtTime(forward[2], t, 0.01);
+      l.upX.setTargetAtTime(up[0], t, 0.01); l.upY.setTargetAtTime(up[1], t, 0.01); l.upZ.setTargetAtTime(up[2], t, 0.01);
+    } else { l.setPosition(...position); l.setOrientation(...forward, ...up); }
+  }
+  resetListener() { this.setListener([0, 0, 0], [0, 0, -1], [0, 1, 0]); }
   // Tempo da música que está a ser processado agora pelo grafo (para agendar).
   graphSeconds() { return this.playing ? this.ctx.currentTime - this.t0 + this.offset : this.offset; }
   // Tempo da música que se está a ouvir agora (para desenhar).
@@ -123,15 +134,48 @@ export class AudioEngine {
   }
   seek(seconds) { const was = this.playing; this.stop(); this.offset = Math.max(0, Math.min(seconds, this.duration)); if (was) this.play(this.offset); }
   ended() { return this.playing && this.graphSeconds() >= this.duration; }
+  // Estalo dos dedos (HandSynth::snap): «sopro» de dois dentes de serra desafinados 12 cents num filtro baixo de
+  // 1,4 kHz, ataque 15 ms e queda de 0,5 s sem sustentação, ganho 0,35; nasce onde o estalo foi detetado
+  // (espaço local do WebXR). Um estalo novo da mesma mão solta o anterior (release 0,3 s).
+  snap(hand, note, velocity, position) {
+    if (!this.synth) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    this.snapVoices ??= [null, null];
+    const previous = this.snapVoices[hand];
+    if (previous) { previous.env.gain.cancelScheduledValues(t); previous.env.gain.setTargetAtTime(0, t, 0.3 / 4); }
+    const f = 440 * 2 ** ((note - 69) / 12);
+    const oscillators = [0, 12].map((cents) => new OscillatorNode(ctx, { type: 'sawtooth', frequency: f, detune: cents }));
+    const mixGain = new GainNode(ctx, { gain: 0.5 });
+    const filter = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 1400, Q: 1.2 });
+    const env = new GainNode(ctx, { gain: 0 });
+    const panner = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: SOURCE_DISTANCE_M, rolloffFactor: 1,
+      positionX: position[0], positionY: position[1], positionZ: position[2] });
+    for (const o of oscillators) o.connect(mixGain);
+    mixGain.connect(filter).connect(env).connect(panner).connect(this.pre);
+    const peak = velocity * 0.35;
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(peak, t + 0.015);
+    env.gain.setTargetAtTime(0, t + 0.015, 0.5 / 4);
+    const voice = {
+      env,
+      stop: (when) => { for (const o of oscillators) o.stop(when); },
+    };
+    for (const o of oscillators) o.start(t);
+    voice.stop(t + 1.2);
+    oscillators[0].onended = () => { panner.disconnect(); if (this.snapVoices[hand] === voice) this.snapVoices[hand] = null; };
+    this.snapVoices[hand] = voice;
+  }
   // Agenda as notas no relógio da placa, na semicolcheia exata.
   playNotes(notes) {
     if (!this.synth || !this.playing) return;
     for (const n of notes) {
       const when = Math.max(this.ctx.currentTime, this.t0 + n.seconds - this.offset);
       const p = this.panners[n.voice];
+      // Notas do olhar: direção no mundo (mão esquerda, +z à frente). Notas das mãos (VR): espaço local do
+      // WebXR, já com -z à frente como o Web Audio.
       p.positionX.setValueAtTime(n.position[0], when);
       p.positionY.setValueAtTime(n.position[1], when);
-      p.positionZ.setValueAtTime(-n.position[2], when);
+      p.positionZ.setValueAtTime(n.local ? n.position[2] : -n.position[2], when);
       this.synth.port.postMessage({ type: 'note', source: n.voice, note: n.note, velocity: n.velocity, frame: Math.round(when * this.ctx.sampleRate) });
     }
   }
